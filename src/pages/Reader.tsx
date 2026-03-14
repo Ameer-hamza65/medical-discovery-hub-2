@@ -267,6 +267,8 @@ export default function Reader() {
                   chapterTitle={chapter.title}
                   chapterContent={chapter.content}
                   bookTitle={book.title}
+                  bookId={book.id}
+                  chapterId={chapter.id}
                   onAIQuery={handleAIQuery}
                 />
               )}

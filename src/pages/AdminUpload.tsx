@@ -158,14 +158,138 @@ export default function AdminUpload() {
     }
   }, [toast]);
 
+  // PDF parsing using AI-powered edge function
+  const parsePdf = useCallback(async (file: File) => {
+    setIsParsing(true);
+    setParseProgress(10);
+
+    try {
+      const progressInterval = setInterval(() => {
+        setParseProgress(prev => Math.min(prev + 3, 80));
+      }, 500);
+
+      // Convert file to base64
+      const arrayBuffer = await file.arrayBuffer();
+      const bytes = new Uint8Array(arrayBuffer);
+      let binary = '';
+      for (let i = 0; i < bytes.length; i++) {
+        binary += String.fromCharCode(bytes[i]);
+      }
+      const pdfBase64 = btoa(binary);
+
+      setParseProgress(30);
+
+      // Call the parse-pdf edge function
+      const { data, error } = await supabase.functions.invoke('parse-pdf', {
+        body: { pdfBase64, fileName: file.name },
+      });
+
+      clearInterval(progressInterval);
+      setParseProgress(90);
+
+      if (error) throw error;
+      if (!data || !data.title) throw new Error('Invalid response from PDF parser');
+
+      // Map AI-extracted chapters
+      const extractedChapters: ParsedChapter[] = (data.chapters || []).map((ch: { title: string; pageNumber?: number; contentSummary?: string }, idx: number) => ({
+        id: `ch-pdf-${Date.now()}-${idx + 1}`,
+        title: ch.title,
+        content: ch.contentSummary || '',
+        pageNumber: ch.pageNumber || idx + 1,
+        href: '',
+        tags: autoDetectMedicalTags(ch.title + ' ' + (ch.contentSummary || '')),
+      }));
+
+      // If no chapters extracted, add at least one
+      if (extractedChapters.length === 0) {
+        extractedChapters.push({
+          id: `ch-pdf-${Date.now()}-1`,
+          title: 'Full Document',
+          content: data.description || '',
+          pageNumber: 1,
+          href: '',
+          tags: data.detectedTags || [],
+        });
+      }
+
+      setParsedData({
+        title: data.title,
+        authors: data.authors?.length ? data.authors : [''],
+        publisher: data.publisher || '',
+        isbn: data.isbn || '',
+        description: data.description || '',
+        language: 'en',
+        publishedDate: data.publishedYear ? `${data.publishedYear}` : new Date().toISOString().split('T')[0],
+        tableOfContents: extractedChapters,
+      });
+
+      setBookData(prev => ({
+        ...prev,
+        title: data.title,
+        subtitle: data.subtitle || '',
+        authors: data.authors?.length ? data.authors : [''],
+        publisher: data.publisher || '',
+        isbn: data.isbn || '',
+        description: data.description || '',
+        publishedYear: data.publishedYear || new Date().getFullYear(),
+        edition: data.edition || '',
+        specialty: data.specialty || '',
+      }));
+
+      setChapters(extractedChapters);
+
+      const allTags = [...new Set([
+        ...(data.detectedTags || []),
+        ...extractedChapters.flatMap((ch: ParsedChapter) => ch.tags),
+      ])];
+      setSelectedTags(allTags);
+
+      setParseProgress(100);
+      setIsParsing(false);
+      setActiveTab('metadata');
+
+      toast({
+        title: "PDF Parsed Successfully",
+        description: `Extracted metadata and ${extractedChapters.length} sections from "${data.title}".`,
+      });
+    } catch (error) {
+      console.error('PDF parsing error:', error);
+      setIsParsing(false);
+      setParseProgress(0);
+
+      // Fallback to manual entry
+      const titleFromName = file.name.replace('.pdf', '').replace(/[-_]/g, ' ');
+      setBookData(prev => ({ ...prev, title: titleFromName }));
+      setParsedData({
+        title: titleFromName, authors: [''], publisher: '', isbn: '',
+        description: '', language: 'en', publishedDate: new Date().toISOString().split('T')[0],
+        tableOfContents: [],
+      });
+      setChapters([{
+        id: `ch-pdf-${Date.now()}-1`, title: 'Full Document',
+        content: '', pageNumber: 1, href: '', tags: [],
+      }]);
+      setActiveTab('metadata');
+
+      toast({
+        title: "Auto-Parse Failed",
+        description: "AI extraction failed. You can fill in metadata manually or retry.",
+        variant: "destructive",
+      });
+    }
+  }, [toast]);
+
   const handleFileUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (!file.name.endsWith('.epub')) {
+    const isEpub = file.name.endsWith('.epub');
+    const isPdf = file.name.endsWith('.pdf');
+    
+    if (!isEpub && !isPdf) {
       toast({
         title: "Invalid File Type",
-        description: "Please upload an EPUB file (.epub)",
+        description: "Please upload an EPUB (.epub) or PDF (.pdf) file",
         variant: "destructive",
       });
       return;
@@ -173,24 +297,28 @@ export default function AdminUpload() {
 
     setUploadedFile(file);
     setIsUploading(true);
-
-    // Brief upload delay
     await new Promise(resolve => setTimeout(resolve, 500));
     setIsUploading(false);
 
-    // Start parsing
-    await parseEpub(file);
-  }, [parseEpub, toast]);
+    if (isEpub) {
+      await parseEpub(file);
+    } else {
+      await parsePdf(file);
+    }
+  }, [parseEpub, parsePdf, toast]);
 
   const handleDrop = useCallback(async (e: React.DragEvent) => {
     e.preventDefault();
     const file = e.dataTransfer.files[0];
     if (!file) return;
 
-    if (!file.name.endsWith('.epub')) {
+    const isEpub = file.name.endsWith('.epub');
+    const isPdf = file.name.endsWith('.pdf');
+    
+    if (!isEpub && !isPdf) {
       toast({
         title: "Invalid File Type",
-        description: "Please upload an EPUB file (.epub)",
+        description: "Please upload an EPUB (.epub) or PDF (.pdf) file",
         variant: "destructive",
       });
       return;
@@ -200,8 +328,13 @@ export default function AdminUpload() {
     setIsUploading(true);
     await new Promise(resolve => setTimeout(resolve, 500));
     setIsUploading(false);
-    await parseEpub(file);
-  }, [parseEpub, toast]);
+    
+    if (isEpub) {
+      await parseEpub(file);
+    } else {
+      await parsePdf(file);
+    }
+  }, [parseEpub, parsePdf, toast]);
 
   const handleAddAuthor = () => {
     setBookData(prev => ({
@@ -354,109 +487,194 @@ Keep the tone professional and clear. Do not include headings, bullet points, or
     }
   }, [chapters, parsedData, toast]);
 
+  const [isSaving, setIsSaving] = useState(false);
+
   const handleSaveBook = async () => {
     // Validate required fields
-    if (!bookData.title || !bookData.specialty || !bookData.price) {
+    if (!bookData.title || !bookData.specialty) {
       toast({
         title: "Missing Required Fields",
-        description: "Please fill in title, specialty, and price.",
+        description: "Please fill in title and specialty.",
         variant: "destructive",
       });
       return;
     }
 
-    // Validate chapters have content
-    if (chapters.length === 0) {
-      toast({
-        title: "No Chapters",
-        description: "Please ensure the EPUB was parsed successfully and has chapters.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    // Filter out chapters with no content
+    // Validate chapters have content (relaxed for PDFs which have placeholder content)
+    const isPdfFile = uploadedFile?.name.endsWith('.pdf');
     const validChapters = chapters.filter(ch => ch.content && ch.content.trim().length > 0);
-    
-    if (validChapters.length === 0) {
+    if (validChapters.length === 0 && !isPdfFile) {
       toast({
         title: "No Chapter Content",
-        description: "Chapters were extracted but contain no readable content. Please check the EPUB file.",
+        description: "Please ensure the file was parsed successfully and has chapters.",
         variant: "destructive",
       });
       return;
     }
+    const chaptersToSave = validChapters.length > 0 ? validChapters : chapters;
 
-    if (validChapters.length < chapters.length) {
-      toast({
-        title: "Some Chapters Skipped",
-        description: `${chapters.length - validChapters.length} chapters had no content and were excluded.`,
-        variant: "default",
+    setIsSaving(true);
+
+    try {
+      // 1. Upload file to storage bucket if we have it
+      let filePath: string | null = null;
+      if (uploadedFile) {
+        const fileExt = uploadedFile.name.split('.').pop();
+        const fileName = `${Date.now()}-${uploadedFile.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
+        filePath = `uploads/${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('book-files')
+          .upload(filePath, uploadedFile, {
+            contentType: uploadedFile.name.endsWith('.pdf') ? 'application/pdf' : (uploadedFile.type || 'application/epub+zip'),
+            upsert: false,
+          });
+
+        if (uploadError) {
+          console.warn('Storage upload failed (continuing without file):', uploadError);
+          filePath = null;
+        }
+      }
+
+      // 2. Insert book record into database
+      const { data: bookRecord, error: bookError } = await supabase
+        .from('books')
+        .insert({
+          title: bookData.title,
+          subtitle: bookData.subtitle || null,
+          authors: bookData.authors.filter(a => a.trim()),
+          publisher: bookData.publisher || null,
+          isbn: bookData.isbn || null,
+          published_year: bookData.publishedYear,
+          edition: bookData.edition || null,
+          cover_color: bookData.coverColor,
+          file_path: filePath,
+          file_type: uploadedFile?.name.endsWith('.pdf') ? 'pdf' : 'epub',
+          description: bookData.description || '',
+          specialty: bookData.specialty,
+          tags: selectedTags,
+          chapter_count: validChapters.length,
+        })
+        .select()
+        .single();
+
+      if (bookError) {
+        // If DB insert fails, still add to local context as fallback
+        console.error('DB insert failed, using local fallback:', bookError);
+        const fallbackBook: EpubBook = {
+          id: `book-${Date.now()}`,
+          title: bookData.title,
+          subtitle: bookData.subtitle,
+          authors: bookData.authors.filter(a => a.trim()),
+          publisher: bookData.publisher,
+          isbn: bookData.isbn,
+          publishedYear: bookData.publishedYear,
+          edition: bookData.edition,
+          coverColor: bookData.coverColor,
+          price: bookData.price,
+          description: bookData.description,
+          specialty: bookData.specialty,
+          accessCount: 0,
+          searchCount: 0,
+          tags: selectedTags,
+          tableOfContents: validChapters.map(ch => ({
+            id: ch.id,
+            title: ch.title,
+            content: ch.content,
+            pageNumber: ch.pageNumber,
+            tags: ch.tags,
+          })),
+        };
+        addBook(fallbackBook);
+        
+        toast({
+          title: "Book Saved Locally",
+          description: `"${bookData.title}" saved to session (database unavailable). ${bookError.message}`,
+        });
+      } else {
+        // 3. Insert chapters into database
+        const chapterInserts = validChapters.map((ch, idx) => ({
+          book_id: bookRecord.id,
+          chapter_key: ch.id,
+          title: ch.title,
+          content: ch.content,
+          page_number: ch.pageNumber,
+          tags: ch.tags,
+          sort_order: idx,
+        }));
+
+        const { error: chapError } = await supabase
+          .from('book_chapters')
+          .insert(chapterInserts);
+
+        if (chapError) {
+          console.error('Chapter insert error:', chapError);
+        }
+
+        // Also add to local context for immediate availability
+        const newBook: EpubBook = {
+          id: bookRecord.id,
+          title: bookData.title,
+          subtitle: bookData.subtitle,
+          authors: bookData.authors.filter(a => a.trim()),
+          publisher: bookData.publisher,
+          isbn: bookData.isbn,
+          publishedYear: bookData.publishedYear,
+          edition: bookData.edition,
+          coverColor: bookData.coverColor,
+          price: bookData.price,
+          description: bookData.description,
+          specialty: bookData.specialty,
+          accessCount: 0,
+          searchCount: 0,
+          tags: selectedTags,
+          tableOfContents: validChapters.map(ch => ({
+            id: ch.id,
+            title: ch.title,
+            content: ch.content,
+            pageNumber: ch.pageNumber,
+            tags: ch.tags,
+          })),
+        };
+        addBook(newBook);
+
+        toast({
+          title: "🎉 Book Saved to Database!",
+          description: `"${bookData.title}" persisted with ${validChapters.length} chapters${filePath ? ' and EPUB file stored' : ''}.`,
+        });
+      }
+
+      // Reset form
+      setUploadedFile(null);
+      setParsedData(null);
+      setBookData({
+        title: '',
+        subtitle: '',
+        authors: [''],
+        publisher: '',
+        isbn: '',
+        publishedYear: new Date().getFullYear(),
+        edition: '',
+        description: '',
+        specialty: '',
+        price: 0,
+        coverColor: COVER_COLORS[0].value,
       });
+      setChapters([]);
+      setSelectedTags([]);
+      setActiveTab('upload');
+
+      navigate('/library');
+    } catch (err) {
+      console.error('Save error:', err);
+      toast({
+        title: "Save Failed",
+        description: "An unexpected error occurred. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
     }
-
-    // Log chapter content for debugging
-    console.log(`[AdminUpload] Saving book with ${validChapters.length} chapters:`);
-    validChapters.forEach((ch, idx) => {
-      console.log(`  Chapter ${idx + 1}: "${ch.title}" - ${ch.content.length} chars`);
-    });
-
-    // Create the new book object
-    const newBook: EpubBook = {
-      id: `book-${Date.now()}`,
-      title: bookData.title,
-      subtitle: bookData.subtitle,
-      authors: bookData.authors.filter(a => a.trim()),
-      publisher: bookData.publisher,
-      isbn: bookData.isbn,
-      publishedYear: bookData.publishedYear,
-      edition: bookData.edition,
-      coverColor: bookData.coverColor,
-      price: bookData.price,
-      description: bookData.description,
-      specialty: bookData.specialty,
-      accessCount: 0,
-      searchCount: 0,
-      tags: selectedTags,
-      tableOfContents: validChapters.map(ch => ({
-        id: ch.id,
-        title: ch.title,
-        content: ch.content, // FULL content - no truncation!
-        pageNumber: ch.pageNumber,
-        tags: ch.tags,
-      })),
-    };
-
-    // Add book to the library
-    addBook(newBook);
-
-    toast({
-      title: "🎉 Book Added Successfully!",
-      description: `"${bookData.title}" has been added to the library. Total books: ${totalBooks + 1}`,
-    });
-
-    // Reset form
-    setUploadedFile(null);
-    setParsedData(null);
-    setBookData({
-      title: '',
-      subtitle: '',
-      authors: [''],
-      publisher: '',
-      isbn: '',
-      publishedYear: new Date().getFullYear(),
-      edition: '',
-      description: '',
-      specialty: '',
-      price: 0,
-      coverColor: COVER_COLORS[0].value,
-    });
-    setChapters([]);
-    setSelectedTags([]);
-    setActiveTab('upload');
-
-    // Navigate to library to see the new book
-    navigate('/library');
   };
 
   return (
@@ -527,7 +745,7 @@ Keep the tone professional and clear. Do not include headings, bullet points, or
                   ) : isParsing ? (
                     <div className="space-y-4">
                       <FileText className="h-12 w-12 text-accent mx-auto" />
-                      <p className="text-lg font-medium">Parsing EPUB...</p>
+                      <p className="text-lg font-medium">Parsing file...</p>
                       <Progress value={parseProgress} className="max-w-xs mx-auto" />
                       <p className="text-sm text-muted-foreground">
                         Extracting metadata, chapters, and content
@@ -543,14 +761,14 @@ Keep the tone professional and clear. Do not include headings, bullet points, or
                     <>
                       <Upload className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                       <p className="text-lg font-medium mb-2">
-                        Drag & drop your EPUB file here
+                        Drag & drop your EPUB or PDF file here
                       </p>
                       <p className="text-sm text-muted-foreground mb-4">
-                        or click to browse
+                        Supports .epub and .pdf formats
                       </p>
                       <input
                         type="file"
-                        accept=".epub"
+                        accept=".epub,.pdf"
                         onChange={handleFileUpload}
                         className="hidden"
                         id="epub-upload"
@@ -567,13 +785,13 @@ Keep the tone professional and clear. Do not include headings, bullet points, or
                 <div className="mt-6 p-4 rounded-lg bg-muted/50 border border-border">
                   <h4 className="font-medium mb-2 flex items-center gap-2">
                     <AlertCircle className="h-4 w-4 text-warning" />
-                    EPUB Processing Features
+                    Content Processing Features
                   </h4>
                   <ul className="text-sm text-muted-foreground space-y-1">
-                    <li>✓ Extracts title, authors, publisher, ISBN from metadata</li>
-                    <li>✓ Parses table of contents and chapter structure</li>
-                    <li>✓ Extracts chapter text for search indexing</li>
+                    <li>✓ <strong>EPUB:</strong> Extracts metadata, TOC, and chapter text automatically</li>
+                    <li>✓ <strong>PDF:</strong> Upload with manual metadata entry</li>
                     <li>✓ Auto-detects medical tags from content</li>
+                    <li>✓ Stores files securely in repository</li>
                   </ul>
                 </div>
               </CardContent>
@@ -948,9 +1166,13 @@ Keep the tone professional and clear. Do not include headings, bullet points, or
                 <Button variant="outline" onClick={() => setActiveTab('chapters')}>
                   Back
                 </Button>
-                <Button variant="cta" size="lg" onClick={handleSaveBook}>
-                  <Save className="h-4 w-4 mr-2" />
-                  Save Book to Library
+                <Button variant="cta" size="lg" onClick={handleSaveBook} disabled={isSaving}>
+                  {isSaving ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Save className="h-4 w-4 mr-2" />
+                  )}
+                  {isSaving ? 'Saving to Database...' : 'Save Book to Library'}
                 </Button>
               </div>
             </div>

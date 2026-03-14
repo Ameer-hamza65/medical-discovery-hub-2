@@ -13,6 +13,10 @@ export default {
       },
     },
     extend: {
+      fontFamily: {
+        sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+        mono: ['JetBrains Mono', 'monospace'],
+      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
@@ -75,6 +79,8 @@ export default {
         'card': 'var(--shadow-card)',
         'card-hover': 'var(--shadow-card-hover)',
         'medical': 'var(--shadow-lg)',
+        'glow': 'var(--shadow-glow)',
+        'glow-lg': 'var(--shadow-glow-lg)',
       },
       keyframes: {
         "accordion-down": {
@@ -89,11 +95,21 @@ export default {
           "0%, 100%": { opacity: "1" },
           "50%": { opacity: "0.8" },
         },
+        "shimmer": {
+          "0%": { backgroundPosition: "-200% 0" },
+          "100%": { backgroundPosition: "200% 0" },
+        },
+        "gradient-shift": {
+          "0%, 100%": { backgroundPosition: "0% 50%" },
+          "50%": { backgroundPosition: "100% 50%" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
         "pulse-subtle": "pulse-subtle 2s ease-in-out infinite",
+        "shimmer": "shimmer 3s linear infinite",
+        "gradient-shift": "gradient-shift 8s ease infinite",
       },
     },
   },

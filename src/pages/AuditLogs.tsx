@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { motion } from 'framer-motion';
 import { useEnterprise } from '@/context/EnterpriseContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -88,7 +89,8 @@ export default function AuditLogs() {
     download: <Download className="h-4 w-4" />,
     login: <LogIn className="h-4 w-4" />,
     logout: <LogOut className="h-4 w-4" />,
-    access_collection: <FolderOpen className="h-4 w-4" />
+    access_collection: <FolderOpen className="h-4 w-4" />,
+    request_addon: <BookOpen className="h-4 w-4" />
   };
 
   const actionLabels: Record<AuditLogEntry['action'], string> = {
@@ -98,7 +100,8 @@ export default function AuditLogs() {
     download: 'Download',
     login: 'Login',
     logout: 'Logout',
-    access_collection: 'Accessed Collection'
+    access_collection: 'Accessed Collection',
+    request_addon: 'Add-On Request'
   };
 
   const filteredLogs = useMemo(() => {
@@ -146,23 +149,32 @@ export default function AuditLogs() {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <div className="bg-primary text-primary-foreground">
+      <div className="medical-gradient">
         <div className="container mx-auto px-4 py-6">
-          <div className="flex items-center justify-between">
+          <motion.div
+            className="flex items-center justify-between"
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+          >
             <div>
-              <h1 className="text-2xl font-bold">Audit Logs</h1>
-              <p className="text-primary-foreground/80">{currentEnterprise.name}</p>
+              <h1 className="text-2xl font-bold text-foreground">Audit Logs</h1>
+              <p className="text-muted-foreground">{currentEnterprise.name}</p>
             </div>
             <Button variant="secondary" onClick={() => navigate('/enterprise')}>
               Back to Dashboard
             </Button>
-          </div>
+          </motion.div>
         </div>
       </div>
 
       <div className="container mx-auto px-4 py-8">
-        {/* Filters */}
-        <Card className="mb-6">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.1 }}
+        >
+        <Card className="mb-6 glass-card">
           <CardContent className="pt-6">
             <div className="flex flex-col md:flex-row gap-4">
               <div className="relative flex-1">
@@ -207,9 +219,16 @@ export default function AuditLogs() {
             </div>
           </CardContent>
         </Card>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.2 }}
+        >
 
         {/* Logs Table */}
-        <Card>
+        <Card className="glass-card">
           <CardHeader>
             <CardTitle className="text-lg">Activity Log</CardTitle>
             <CardDescription>
@@ -283,6 +302,7 @@ export default function AuditLogs() {
             </div>
           </CardContent>
         </Card>
+        </motion.div>
       </div>
     </div>
   );

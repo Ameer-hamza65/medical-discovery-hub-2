@@ -18,6 +18,19 @@ import {
   mockUsageStats,
   mockComplianceStatus
 } from '@/data/mockEnterpriseData';
+import {
+  LicensingTier,
+  TierDefinition,
+  Facility,
+  FacilityUsageStats,
+  getTierDefinition,
+  canAccessCollection,
+  getAccessibleCollections,
+  isWithinSeatLimit,
+  getRemainingAIQueries,
+  mockFacilities,
+  mockFacilityUsageStats,
+} from '@/data/complianceData';
 
 interface EnterpriseContextType {
   // Current session
@@ -35,6 +48,18 @@ interface EnterpriseContextType {
   usageStats: UsageStats;
   complianceStatus: ComplianceStatus[];
   
+  // Tier system
+  currentTier: TierDefinition | null;
+  
+  // Multi-location
+  facilities: Facility[];
+  facilityUsageStats: FacilityUsageStats[];
+  getEnterpriseFacilities: (enterpriseId: string) => Facility[];
+  
+  // Seat enforcement
+  isSeatLimitExceeded: boolean;
+  seatUtilizationPercent: number;
+  
   // Actions
   loginAsEnterpriseUser: (userId: string) => void;
   loginAsEnterprise: (enterpriseId: string, role?: EnterpriseRole) => void;
@@ -42,6 +67,7 @@ interface EnterpriseContextType {
   
   // Access checks
   hasBookAccess: (bookId: string) => boolean;
+  canAccessCollectionByTier: (collectionId: string) => boolean;
   getUserDepartments: (userId: string) => Department[];
   getEnterpriseUsers: (enterpriseId: string) => EnterpriseUser[];
   getEnterpriseDepartments: (enterpriseId: string) => Department[];
@@ -74,6 +100,32 @@ export function EnterpriseProvider({ children }: { children: ReactNode }) {
   const [currentEnterprise, setCurrentEnterprise] = useState<Enterprise | null>(null);
 
   const isEnterpriseMode = useMemo(() => currentEnterprise !== null, [currentEnterprise]);
+  const currentTier = useMemo(() => 
+    currentEnterprise ? getTierDefinition(currentEnterprise.licensingTier) : null,
+    [currentEnterprise]
+  );
+
+  const seatUtilizationPercent = useMemo(() => {
+    if (!currentEnterprise || currentEnterprise.licenseSeats === 0) return 0;
+    return Math.round((currentEnterprise.usedSeats / currentEnterprise.licenseSeats) * 100);
+  }, [currentEnterprise]);
+
+  const isSeatLimitExceeded = useMemo(() => {
+    if (!currentEnterprise || !currentTier) return false;
+    return !isWithinSeatLimit(currentEnterprise.licensingTier, currentEnterprise.usedSeats);
+  }, [currentEnterprise, currentTier]);
+
+  const facilitiesState = useState<Facility[]>(mockFacilities)[0];
+  const facilityUsageStatsState = useState<FacilityUsageStats[]>(mockFacilityUsageStats)[0];
+
+  const getEnterpriseFacilities = useCallback((enterpriseId: string): Facility[] => {
+    return facilitiesState.filter(f => f.enterpriseId === enterpriseId);
+  }, [facilitiesState]);
+
+  const canAccessCollectionByTier = useCallback((collectionId: string): boolean => {
+    if (!currentEnterprise) return false;
+    return canAccessCollection(currentEnterprise.licensingTier, collectionId);
+  }, [currentEnterprise]);
 
   const loginAsEnterpriseUser = useCallback((userId: string) => {
     const user = users.find(u => u.id === userId);
@@ -195,10 +247,17 @@ export function EnterpriseProvider({ children }: { children: ReactNode }) {
     auditLogs,
     usageStats,
     complianceStatus,
+    currentTier,
+    isSeatLimitExceeded,
+    seatUtilizationPercent,
+    facilities: facilitiesState,
+    facilityUsageStats: facilityUsageStatsState,
+    getEnterpriseFacilities,
     loginAsEnterpriseUser,
     loginAsEnterprise,
     logoutEnterprise,
     hasBookAccess,
+    canAccessCollectionByTier,
     getUserDepartments,
     getEnterpriseUsers,
     getEnterpriseDepartments,

@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { X, Book, Bookmark, Share2, ChevronLeft, ChevronRight, Maximize2 } from 'lucide-react';
+import { Bookmark, Share2, ChevronLeft, ChevronRight, Maximize2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -13,8 +13,6 @@ interface ChapterReaderProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onViewChapter: (book: EpubBook, chapter: Chapter) => void;
-  onBuyBook: (book: EpubBook) => void;
-  onSubscribe: () => void;
 }
 
 export function ChapterReader({
@@ -23,8 +21,6 @@ export function ChapterReader({
   open,
   onOpenChange,
   onViewChapter,
-  onBuyBook,
-  onSubscribe,
 }: ChapterReaderProps) {
   const navigate = useNavigate();
 
@@ -73,10 +69,8 @@ export function ChapterReader({
         </DialogHeader>
 
         <div className="flex flex-1 overflow-hidden">
-          {/* Main Content */}
           <ScrollArea className="flex-1 h-full">
             <div className="p-8 max-w-3xl mx-auto">
-              {/* Tags */}
               <div className="flex flex-wrap gap-2 mb-6">
                 {chapter.tags.map(tagId => (
                   <span key={tagId} className="medical-tag">
@@ -85,7 +79,6 @@ export function ChapterReader({
                 ))}
               </div>
 
-              {/* Content */}
               <article className="prose prose-slate max-w-none">
                 <p className="text-lg leading-relaxed text-foreground">
                   {chapter.content}
@@ -110,14 +103,9 @@ export function ChapterReader({
                 </div>
               </article>
 
-              {/* Chapter Navigation */}
               <div className="flex items-center justify-between mt-8 pt-6 border-t border-border/50">
                 {prevChapter ? (
-                  <Button
-                    variant="ghost"
-                    onClick={() => onViewChapter(book, prevChapter)}
-                    className="text-left"
-                  >
+                  <Button variant="ghost" onClick={() => onViewChapter(book, prevChapter)} className="text-left">
                     <ChevronLeft className="h-4 w-4 mr-2" />
                     <div>
                       <p className="text-xs text-muted-foreground">Previous</p>
@@ -127,11 +115,7 @@ export function ChapterReader({
                 ) : <div />}
                 
                 {nextChapter ? (
-                  <Button
-                    variant="ghost"
-                    onClick={() => onViewChapter(book, nextChapter)}
-                    className="text-right"
-                  >
+                  <Button variant="ghost" onClick={() => onViewChapter(book, nextChapter)} className="text-right">
                     <div>
                       <p className="text-xs text-muted-foreground">Next</p>
                       <p className="text-sm font-medium truncate max-w-48">{nextChapter.title}</p>
@@ -143,14 +127,11 @@ export function ChapterReader({
             </div>
           </ScrollArea>
 
-          {/* Sidebar */}
           <div className="hidden lg:block w-80 border-l border-border/50 bg-muted/30">
             <ScrollArea className="h-full p-4">
               <RelatedContent
                 currentChapterId={chapter.id}
                 onViewChapter={onViewChapter}
-                onBuyBook={onBuyBook}
-                onSubscribe={onSubscribe}
               />
             </ScrollArea>
           </div>

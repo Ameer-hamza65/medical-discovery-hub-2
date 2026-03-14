@@ -1,7 +1,9 @@
-// Mock Enterprise Data for POC Demo
-// Enterprise-level SaaS architecture with institutional models
+// Compliance Collections AI - Enterprise Data Models
+// Institutional SaaS architecture with tiered licensing
 
-export type EnterpriseType = 'hospital' | 'medical_school' | 'government' | 'individual';
+import { LicensingTier } from './complianceData';
+
+export type EnterpriseType = 'hospital' | 'surgery_center' | 'medical_school' | 'government';
 export type EnterpriseRole = 'admin' | 'compliance_officer' | 'department_manager' | 'staff';
 
 export interface Enterprise {
@@ -12,6 +14,7 @@ export interface Enterprise {
   contactEmail: string;
   licenseSeats: number;
   usedSeats: number;
+  licensingTier: LicensingTier;
   createdAt: string;
   logoColor: string;
 }
@@ -60,7 +63,7 @@ export interface AuditLogEntry {
   userId: string;
   userName: string;
   enterpriseId: string;
-  action: 'view_book' | 'view_chapter' | 'search' | 'download' | 'login' | 'logout' | 'access_collection';
+  action: 'view_book' | 'view_chapter' | 'search' | 'download' | 'login' | 'logout' | 'access_collection' | 'request_addon';
   targetType?: 'book' | 'chapter' | 'collection' | 'search';
   targetId?: string;
   targetTitle?: string;
@@ -70,7 +73,7 @@ export interface AuditLogEntry {
   userAgent?: string;
 }
 
-// Demo Enterprises
+// Demo Enterprises with Tiered Licensing
 export const mockEnterprises: Enterprise[] = [
   {
     id: 'ent-metro-general',
@@ -80,30 +83,33 @@ export const mockEnterprises: Enterprise[] = [
     contactEmail: 'admin@metrogeneral.org',
     licenseSeats: 250,
     usedSeats: 187,
+    licensingTier: 'enterprise',
     createdAt: '2024-01-15T00:00:00Z',
     logoColor: 'hsl(213 50% 35%)'
   },
   {
-    id: 'ent-stanford-med',
-    name: 'Stanford Medical School',
-    type: 'medical_school',
-    domain: 'stanford.edu',
-    contactEmail: 'medlibrary@stanford.edu',
-    licenseSeats: 500,
-    usedSeats: 423,
-    createdAt: '2023-09-01T00:00:00Z',
-    logoColor: 'hsl(0 70% 45%)'
+    id: 'ent-bayview-surgical',
+    name: 'Bayview Surgical Center',
+    type: 'surgery_center',
+    domain: 'bayviewsurgical.com',
+    contactEmail: 'compliance@bayviewsurgical.com',
+    licenseSeats: 25,
+    usedSeats: 18,
+    licensingTier: 'pro',
+    createdAt: '2024-06-01T00:00:00Z',
+    logoColor: 'hsl(166 60% 35%)'
   },
   {
-    id: 'ent-va-hospital',
-    name: 'VA Medical Center - San Francisco',
-    type: 'government',
-    domain: 'va.gov',
-    contactEmail: 'library.sf@va.gov',
-    licenseSeats: 150,
-    usedSeats: 98,
-    createdAt: '2024-03-01T00:00:00Z',
-    logoColor: 'hsl(220 60% 30%)'
+    id: 'ent-community-clinic',
+    name: 'Community Health Clinic',
+    type: 'hospital',
+    domain: 'communityhealthclinic.org',
+    contactEmail: 'admin@communityhealthclinic.org',
+    licenseSeats: 10,
+    usedSeats: 7,
+    licensingTier: 'basic',
+    createdAt: '2024-09-15T00:00:00Z',
+    logoColor: 'hsl(38 80% 45%)'
   }
 ];
 
@@ -129,7 +135,7 @@ export const mockDepartments: Department[] = [
 
 // Demo Enterprise Users
 export const mockEnterpriseUsers: EnterpriseUser[] = [
-  // Metro General Hospital
+  // Metro General Hospital (Enterprise tier)
   {
     id: 'user-admin-1',
     email: 'sarah.johnson@metrogeneral.org',
@@ -185,98 +191,81 @@ export const mockEnterpriseUsers: EnterpriseUser[] = [
     isActive: true,
     lastAccess: '2025-02-03T06:30:00Z'
   },
-  // Stanford Medical School
+  // Bayview Surgical Center (Pro tier)
   {
-    id: 'user-stanford-admin',
-    email: 'robert.kim@stanford.edu',
-    name: 'Dr. Robert Kim',
-    enterpriseId: 'ent-stanford-med',
-    departmentIds: ['dept-clinical-ed'],
+    id: 'user-bayview-admin',
+    email: 'dr.patel@bayviewsurgical.com',
+    name: 'Dr. Amit Patel',
+    enterpriseId: 'ent-bayview-surgical',
+    departmentIds: ['dept-bayview-or'],
     role: 'admin',
-    jobTitle: 'Dean of Medical Education',
+    jobTitle: 'Medical Director',
     isActive: true,
     lastAccess: '2025-02-02T14:00:00Z'
+  },
+  // Community Health Clinic (Basic tier)
+  {
+    id: 'user-community-admin',
+    email: 'maria.garcia@communityhealthclinic.org',
+    name: 'Maria Garcia, RN',
+    enterpriseId: 'ent-community-clinic',
+    departmentIds: ['dept-community-nursing'],
+    role: 'admin',
+    jobTitle: 'Nursing Director',
+    isActive: true,
+    lastAccess: '2025-02-01T10:00:00Z'
   }
 ];
 
-// Compliance Collections (Curated Bundles)
-export const mockComplianceCollections: ComplianceCollection[] = [
-  {
-    id: 'coll-periop',
-    name: 'Perioperative Procedures',
-    description: 'Essential protocols and guidelines for OR nursing staff covering surgical safety, sterile technique, and patient positioning',
-    category: 'perioperative',
-    icon: 'Scissors',
-    bookIds: ['harrison-internal', 'periop-nursing'],
-    isSystemBundle: true
-  },
-  {
-    id: 'coll-anesthesia',
-    name: 'Anesthesia Protocols',
-    description: 'Comprehensive anesthesia guidelines including drug calculations, monitoring standards, and emergency procedures',
-    category: 'anesthesia',
-    icon: 'Syringe',
-    bookIds: ['morgan-anesthesia', 'goldfrank-toxicology'],
-    isSystemBundle: true
-  },
-  {
-    id: 'coll-patient-safety',
-    name: 'Patient Safety Standards',
-    description: 'Critical patient safety protocols covering medication safety, fall prevention, and infection control',
-    category: 'patient_safety',
-    icon: 'ShieldCheck',
-    bookIds: ['harrison-internal', 'acsm-guidelines', 'sabiston-surgery'],
-    isSystemBundle: true
-  },
-  {
-    id: 'coll-surgical',
-    name: 'Surgical Services',
-    description: 'Surgical techniques, pre/post-operative care, and complication management',
-    category: 'surgical',
-    icon: 'Stethoscope',
-    bookIds: ['sabiston-surgery', 'braunwald-cardiology'],
-    isSystemBundle: true
-  },
-  {
-    id: 'coll-cardiac',
-    name: 'Cardiac Care Protocols',
-    description: 'Cardiovascular emergency management, ECG interpretation, and cardiac medication protocols',
-    category: 'general',
-    icon: 'Heart',
-    bookIds: ['braunwald-cardiology', 'harrison-internal'],
-    isSystemBundle: true
-  },
-  {
-    id: 'coll-respiratory',
-    name: 'Respiratory Care',
-    description: 'Pulmonary protocols including ventilator management, airway procedures, and respiratory emergencies',
-    category: 'general',
-    icon: 'Wind',
-    bookIds: ['fishman-pulmonary', 'harrison-internal'],
-    isSystemBundle: true
-  }
-];
+// Compliance Collections - references the 5 defined in complianceData.ts
+// These are the runtime instances with enterprise associations
+import { complianceCollections as collectionDefs } from './complianceData';
 
-// Book Access by Enterprise
+export const mockComplianceCollections: ComplianceCollection[] = collectionDefs.map(def => ({
+  id: def.id,
+  name: def.name,
+  description: def.description,
+  category: def.category as ComplianceCollection['category'],
+  icon: def.icon,
+  bookIds: def.bookIds,
+  isSystemBundle: true,
+}));
+
+// Book Access by Enterprise - Based on Tier
+// Enterprise tier (Metro General): All 50 titles
+// Pro tier (Bayview): All 50 titles
+// Basic tier (Community): First 2 collections only (20 titles)
+
+import { complianceCollections as allCollections } from './complianceData';
+
+const allBookIds = [...new Set(allCollections.flatMap(c => c.bookIds))];
+const basicBookIds = [...new Set(allCollections.slice(0, 2).flatMap(c => c.bookIds))];
+
 export const mockBookAccess: BookAccess[] = [
-  // Metro General Hospital - Full access to most clinical books
-  { id: 'ba-1', enterpriseId: 'ent-metro-general', bookId: 'harrison-internal', accessLevel: 'full', grantedAt: '2024-01-15T00:00:00Z' },
-  { id: 'ba-2', enterpriseId: 'ent-metro-general', bookId: 'braunwald-cardiology', accessLevel: 'full', grantedAt: '2024-01-15T00:00:00Z' },
-  { id: 'ba-3', enterpriseId: 'ent-metro-general', bookId: 'fishman-pulmonary', accessLevel: 'full', grantedAt: '2024-01-15T00:00:00Z' },
-  { id: 'ba-4', enterpriseId: 'ent-metro-general', bookId: 'goldfrank-toxicology', accessLevel: 'full', grantedAt: '2024-01-15T00:00:00Z' },
-  { id: 'ba-5', enterpriseId: 'ent-metro-general', bookId: 'sabiston-surgery', accessLevel: 'full', grantedAt: '2024-01-15T00:00:00Z' },
-  { id: 'ba-6', enterpriseId: 'ent-metro-general', bookId: 'morgan-anesthesia', accessLevel: 'full', grantedAt: '2024-01-15T00:00:00Z' },
-  
-  // Stanford Medical School - Educational access
-  { id: 'ba-7', enterpriseId: 'ent-stanford-med', bookId: 'harrison-internal', accessLevel: 'full', grantedAt: '2023-09-01T00:00:00Z' },
-  { id: 'ba-8', enterpriseId: 'ent-stanford-med', bookId: 'braunwald-cardiology', accessLevel: 'full', grantedAt: '2023-09-01T00:00:00Z' },
-  { id: 'ba-9', enterpriseId: 'ent-stanford-med', bookId: 'williams-endocrinology', accessLevel: 'full', grantedAt: '2023-09-01T00:00:00Z' },
-  { id: 'ba-10', enterpriseId: 'ent-stanford-med', bookId: 'acsm-guidelines', accessLevel: 'full', grantedAt: '2023-09-01T00:00:00Z' },
-  
-  // VA Hospital - Government access
-  { id: 'ba-11', enterpriseId: 'ent-va-hospital', bookId: 'harrison-internal', accessLevel: 'full', grantedAt: '2024-03-01T00:00:00Z' },
-  { id: 'ba-12', enterpriseId: 'ent-va-hospital', bookId: 'sabiston-surgery', accessLevel: 'full', grantedAt: '2024-03-01T00:00:00Z' },
-  { id: 'ba-13', enterpriseId: 'ent-va-hospital', bookId: 'goldfrank-toxicology', accessLevel: 'full', grantedAt: '2024-03-01T00:00:00Z' }
+  // Metro General Hospital (Enterprise) - All titles
+  ...allBookIds.map((bookId, i) => ({
+    id: `ba-metro-${i}`,
+    enterpriseId: 'ent-metro-general',
+    bookId,
+    accessLevel: 'full' as const,
+    grantedAt: '2024-01-15T00:00:00Z',
+  })),
+  // Bayview Surgical (Pro) - All titles
+  ...allBookIds.map((bookId, i) => ({
+    id: `ba-bayview-${i}`,
+    enterpriseId: 'ent-bayview-surgical',
+    bookId,
+    accessLevel: 'full' as const,
+    grantedAt: '2024-06-01T00:00:00Z',
+  })),
+  // Community Clinic (Basic) - First 2 collections only
+  ...basicBookIds.map((bookId, i) => ({
+    id: `ba-community-${i}`,
+    enterpriseId: 'ent-community-clinic',
+    bookId,
+    accessLevel: 'full' as const,
+    grantedAt: '2024-09-15T00:00:00Z',
+  })),
 ];
 
 // Sample Audit Log Entries

@@ -1,10 +1,9 @@
 import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import { Search, Filter, SortAsc } from 'lucide-react';
 import { BookCard } from '@/components/BookCard';
-import { PurchaseModal } from '@/components/PurchaseModal';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import {
   Select,
@@ -14,19 +13,15 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { EpubBook } from '@/data/mockEpubData';
-import { useUser } from '@/context/UserContext';
 import { useBooks } from '@/context/BookContext';
 
 export default function Library() {
   const navigate = useNavigate();
-  const { user, hasFullAccess } = useUser();
   const { books } = useBooks();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSpecialty, setSelectedSpecialty] = useState<string>('all');
   const [sortBy, setSortBy] = useState<string>('popular');
-  const [purchaseBook, setPurchaseBook] = useState<EpubBook | null>(null);
 
-  // Get unique specialties from current books
   const specialties = [...new Set(books.map(b => b.specialty))];
 
   const filteredBooks = books
@@ -39,75 +34,47 @@ export default function Library() {
     })
     .sort((a, b) => {
       switch (sortBy) {
-        case 'popular':
-          return b.accessCount - a.accessCount;
-        case 'newest':
-          return b.publishedYear - a.publishedYear;
-        case 'price-low':
-          return a.price - b.price;
-        case 'price-high':
-          return b.price - a.price;
-        case 'title':
-          return a.title.localeCompare(b.title);
-        default:
-          return 0;
+        case 'popular': return b.accessCount - a.accessCount;
+        case 'newest': return b.publishedYear - a.publishedYear;
+        case 'title': return a.title.localeCompare(b.title);
+        default: return 0;
       }
     });
 
-  const handleBuy = useCallback((book: EpubBook) => {
-    setPurchaseBook(book);
-  }, []);
-
-  const handleSubscribe = useCallback(() => {
-    navigate('/subscribe');
-  }, [navigate]);
-
   const handleView = useCallback((book: EpubBook) => {
-    // Open the book in the reader, starting with the first chapter
     if (book.tableOfContents && book.tableOfContents.length > 0) {
       const firstChapter = book.tableOfContents[0];
       navigate(`/reader?book=${book.id}&chapter=${firstChapter.id}`);
     } else {
-      // If no chapters, navigate to research page
       navigate(`/research?book=${book.id}`);
     }
   }, [navigate]);
 
-  const ownedCount = books.filter(b => hasFullAccess(b.id)).length;
-  const totalValue = books.reduce((sum, b) => sum + b.price, 0);
-
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
       <section className="border-b border-border bg-card">
         <div className="container py-8">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div>
-              <h1 className="text-3xl font-bold text-foreground">Medical Library</h1>
-              <p className="text-muted-foreground mt-1">
-                {books.length} titles from leading medical publishers
-              </p>
-            </div>
-            
-            {user.isLoggedIn && (
-              <div className="flex items-center gap-4">
-                <Badge variant="secondary" className="text-sm py-1.5 px-3">
-                  {ownedCount} of {books.length} titles accessible
-                </Badge>
-                {user.subscriptionType !== 'subscriber' && (
-                  <Button variant="cta" onClick={handleSubscribe}>
-                    Get All for $49/mo
-                  </Button>
-                )}
-              </div>
-            )}
-          </div>
+          <motion.div
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+          >
+            <h1 className="text-3xl font-bold text-foreground">Compliance Content Catalog</h1>
+            <p className="text-muted-foreground mt-1">
+              {books.length} titles across 5 curated compliance collections
+            </p>
+          </motion.div>
         </div>
       </section>
 
       <main className="container py-8">
         {/* Filters */}
-        <div className="flex flex-col sm:flex-row gap-4 mb-8">
+        <motion.div
+          className="flex flex-col sm:flex-row gap-4 mb-8"
+          initial={{ opacity: 0, y: 15 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.1 }}
+        >
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
@@ -139,33 +106,39 @@ export default function Library() {
             <SelectContent>
               <SelectItem value="popular">Most Popular</SelectItem>
               <SelectItem value="newest">Newest</SelectItem>
-              <SelectItem value="price-low">Price: Low to High</SelectItem>
-              <SelectItem value="price-high">Price: High to Low</SelectItem>
               <SelectItem value="title">Title A-Z</SelectItem>
             </SelectContent>
           </Select>
-        </div>
+        </motion.div>
 
-        {/* Results Count */}
         <p className="text-sm text-muted-foreground mb-6">
           Showing {filteredBooks.length} of {books.length} titles
         </p>
 
-        {/* Book Grid */}
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {filteredBooks.map(book => (
-            <BookCard
+          {filteredBooks.map((book, index) => (
+            <motion.div
               key={book.id}
-              book={book}
-              onBuy={handleBuy}
-              onSubscribe={handleSubscribe}
-              onView={handleView}
-            />
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.4, delay: (index % 4) * 0.08 }}
+            >
+              <BookCard
+                book={book}
+                onView={handleView}
+              />
+            </motion.div>
           ))}
         </div>
 
         {filteredBooks.length === 0 && (
-          <div className="text-center py-16">
+          <motion.div 
+            className="text-center py-16"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.4 }}
+          >
             <Search className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
             <h3 className="text-xl font-semibold mb-2">No Books Found</h3>
             <p className="text-muted-foreground mb-4">
@@ -174,35 +147,9 @@ export default function Library() {
             <Button onClick={() => { setSearchTerm(''); setSelectedSpecialty('all'); }}>
               Clear Filters
             </Button>
-          </div>
-        )}
-
-        {/* Subscription CTA */}
-        {user.subscriptionType !== 'subscriber' && (
-          <div className="mt-12 p-8 rounded-2xl medical-gradient text-center">
-            <h2 className="text-2xl md:text-3xl font-bold text-primary-foreground mb-3">
-              Unlock All {books.length} Titles
-            </h2>
-            <p className="text-primary-foreground/80 mb-6 max-w-xl mx-auto">
-              Get unlimited access to ${totalValue.toLocaleString()} worth of medical texts 
-              for just $49/month with Premium subscription.
-            </p>
-            <Button 
-              variant="cta" 
-              size="xl"
-              onClick={handleSubscribe}
-            >
-              Start Premium Subscription
-            </Button>
-          </div>
+          </motion.div>
         )}
       </main>
-
-      <PurchaseModal
-        book={purchaseBook}
-        open={!!purchaseBook}
-        onOpenChange={(open) => !open && setPurchaseBook(null)}
-      />
     </div>
   );
 }

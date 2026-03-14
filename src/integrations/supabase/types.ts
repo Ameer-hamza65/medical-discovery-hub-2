@@ -14,6 +14,65 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_query_logs: {
+        Row: {
+          ai_response: string
+          book_id: string
+          book_title: string
+          chapter_id: string
+          chapter_title: string
+          created_at: string
+          enterprise_id: string | null
+          id: string
+          model_used: string
+          query_type: string
+          response_time_ms: number
+          tokens_used: number | null
+          user_id: string | null
+          user_prompt: string | null
+        }
+        Insert: {
+          ai_response: string
+          book_id: string
+          book_title: string
+          chapter_id: string
+          chapter_title: string
+          created_at?: string
+          enterprise_id?: string | null
+          id?: string
+          model_used: string
+          query_type: string
+          response_time_ms: number
+          tokens_used?: number | null
+          user_id?: string | null
+          user_prompt?: string | null
+        }
+        Update: {
+          ai_response?: string
+          book_id?: string
+          book_title?: string
+          chapter_id?: string
+          chapter_title?: string
+          created_at?: string
+          enterprise_id?: string | null
+          id?: string
+          model_used?: string
+          query_type?: string
+          response_time_ms?: number
+          tokens_used?: number | null
+          user_id?: string | null
+          user_prompt?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_query_logs_enterprise_id_fkey"
+            columns: ["enterprise_id"]
+            isOneToOne: false
+            referencedRelation: "enterprises"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       audit_logs: {
         Row: {
           action: string
@@ -105,6 +164,122 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      book_chapters: {
+        Row: {
+          book_id: string
+          chapter_key: string
+          content: string | null
+          created_at: string
+          id: string
+          page_number: number | null
+          sort_order: number | null
+          tags: string[] | null
+          title: string
+        }
+        Insert: {
+          book_id: string
+          chapter_key: string
+          content?: string | null
+          created_at?: string
+          id?: string
+          page_number?: number | null
+          sort_order?: number | null
+          tags?: string[] | null
+          title: string
+        }
+        Update: {
+          book_id?: string
+          chapter_key?: string
+          content?: string | null
+          created_at?: string
+          id?: string
+          page_number?: number | null
+          sort_order?: number | null
+          tags?: string[] | null
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "book_chapters_book_id_fkey"
+            columns: ["book_id"]
+            isOneToOne: false
+            referencedRelation: "books"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      books: {
+        Row: {
+          access_count: number | null
+          authors: string[]
+          chapter_count: number | null
+          cover_color: string | null
+          cover_url: string | null
+          created_at: string
+          description: string | null
+          edition: string | null
+          file_path: string | null
+          file_type: string | null
+          id: string
+          isbn: string | null
+          published_year: number | null
+          publisher: string | null
+          search_count: number | null
+          specialty: string | null
+          subtitle: string | null
+          tags: string[] | null
+          title: string
+          updated_at: string
+          uploaded_by: string | null
+        }
+        Insert: {
+          access_count?: number | null
+          authors?: string[]
+          chapter_count?: number | null
+          cover_color?: string | null
+          cover_url?: string | null
+          created_at?: string
+          description?: string | null
+          edition?: string | null
+          file_path?: string | null
+          file_type?: string | null
+          id?: string
+          isbn?: string | null
+          published_year?: number | null
+          publisher?: string | null
+          search_count?: number | null
+          specialty?: string | null
+          subtitle?: string | null
+          tags?: string[] | null
+          title: string
+          updated_at?: string
+          uploaded_by?: string | null
+        }
+        Update: {
+          access_count?: number | null
+          authors?: string[]
+          chapter_count?: number | null
+          cover_color?: string | null
+          cover_url?: string | null
+          created_at?: string
+          description?: string | null
+          edition?: string | null
+          file_path?: string | null
+          file_type?: string | null
+          id?: string
+          isbn?: string | null
+          published_year?: number | null
+          publisher?: string | null
+          search_count?: number | null
+          specialty?: string | null
+          subtitle?: string | null
+          tags?: string[] | null
+          title?: string
+          updated_at?: string
+          uploaded_by?: string | null
+        }
+        Relationships: []
       }
       collection_books: {
         Row: {
@@ -388,6 +563,54 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      usage_events: {
+        Row: {
+          book_id: string | null
+          book_title: string | null
+          created_at: string
+          enterprise_id: string | null
+          event_type: string
+          id: string
+          metadata: Json | null
+          user_id: string | null
+        }
+        Insert: {
+          book_id?: string | null
+          book_title?: string | null
+          created_at?: string
+          enterprise_id?: string | null
+          event_type: string
+          id?: string
+          metadata?: Json | null
+          user_id?: string | null
+        }
+        Update: {
+          book_id?: string | null
+          book_title?: string | null
+          created_at?: string
+          enterprise_id?: string | null
+          event_type?: string
+          id?: string
+          metadata?: Json | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "usage_events_book_id_fkey"
+            columns: ["book_id"]
+            isOneToOne: false
+            referencedRelation: "books"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "usage_events_enterprise_id_fkey"
+            columns: ["enterprise_id"]
+            isOneToOne: false
+            referencedRelation: "enterprises"
             referencedColumns: ["id"]
           },
         ]

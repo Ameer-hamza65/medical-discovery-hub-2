@@ -1,10 +1,10 @@
-import { Book, FileText, Tag, ChevronRight, Lock, Check, Crown } from 'lucide-react';
+import { Book, FileText, ChevronRight, Building2, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { EpubBook, Chapter, medicalTags } from '@/data/mockEpubData';
 import { useUser } from '@/context/UserContext';
-import { cn } from '@/lib/utils';
+import { useEnterprise } from '@/context/EnterpriseContext';
 
 interface SearchResultProps {
   book: EpubBook;
@@ -12,8 +12,6 @@ interface SearchResultProps {
   snippet: string;
   relevanceScore: number;
   searchQuery: string;
-  onBuyBook: (book: EpubBook) => void;
-  onSubscribe: () => void;
   onViewChapter: (book: EpubBook, chapter: Chapter) => void;
 }
 
@@ -23,25 +21,21 @@ export function SearchResult({
   snippet,
   relevanceScore,
   searchQuery,
-  onBuyBook,
-  onSubscribe,
   onViewChapter,
 }: SearchResultProps) {
-  const { user, hasFullAccess } = useUser();
+  const { hasFullAccess } = useUser();
+  const { isEnterpriseMode } = useEnterprise();
   const hasAccess = hasFullAccess(book.id);
 
-  // Highlight matching terms in snippet
   const highlightSnippet = (text: string, query: string) => {
     const terms = query.toLowerCase().split(/\s+/);
     let result = text;
-    
     terms.forEach(term => {
       if (term.length > 2) {
         const regex = new RegExp(`(${term})`, 'gi');
         result = result.replace(regex, '<mark class="search-result-highlight">$1</mark>');
       }
     });
-    
     return result;
   };
 
@@ -54,7 +48,6 @@ export function SearchResult({
     <Card className="card-elevated overflow-hidden animate-slide-up group">
       <CardContent className="p-0">
         <div className="flex">
-          {/* Book Cover Indicator */}
           <div 
             className="hidden sm:flex w-2 flex-shrink-0"
             style={{ backgroundColor: book.coverColor }}
@@ -72,7 +65,7 @@ export function SearchResult({
                   {hasAccess && (
                     <span className="owned-badge flex-shrink-0">
                       <Check className="h-3 w-3 mr-1" />
-                      {user.subscriptionType === 'subscriber' ? 'Subscribed' : 'Owned'}
+                      Institutional Access
                     </span>
                   )}
                 </div>
@@ -120,24 +113,14 @@ export function SearchResult({
                   <ChevronRight className="h-4 w-4 ml-1" />
                 </Button>
               ) : (
-                <div className="flex flex-col sm:flex-row gap-2 flex-1">
-                  <Button
-                    variant="cta"
-                    onClick={() => onBuyBook(book)}
-                    className="flex-1 sm:flex-none"
-                  >
-                    <Lock className="h-4 w-4 mr-1.5" />
-                    Buy Book — ${book.price}
-                  </Button>
-                  <Button
-                    variant="premium"
-                    onClick={onSubscribe}
-                    className="flex-1 sm:flex-none"
-                  >
-                    <Crown className="h-4 w-4 mr-1.5" />
-                    Subscribe for All
-                  </Button>
-                </div>
+                <Button
+                  variant="outline"
+                  disabled
+                  className="flex-1 sm:flex-none"
+                >
+                  <Building2 className="h-4 w-4 mr-1.5" />
+                  Institutional Access Required
+                </Button>
               )}
               
               <div className="hidden sm:flex items-center gap-2 text-xs text-muted-foreground">

@@ -1,20 +1,20 @@
-import { Book, Users, Search, Check, Crown, ShoppingCart } from 'lucide-react';
+import { Book, Users, Search, Check, Building2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { EpubBook } from '@/data/mockEpubData';
 import { useUser } from '@/context/UserContext';
+import { useEnterprise } from '@/context/EnterpriseContext';
 import { getBookCover } from '@/assets/covers';
 
 interface BookCardProps {
   book: EpubBook;
-  onBuy: (book: EpubBook) => void;
-  onSubscribe: () => void;
   onView: (book: EpubBook) => void;
 }
 
-export function BookCard({ book, onBuy, onSubscribe, onView }: BookCardProps) {
-  const { user, hasFullAccess, ownsBook } = useUser();
+export function BookCard({ book, onView }: BookCardProps) {
+  const { hasFullAccess } = useUser();
+  const { isEnterpriseMode } = useEnterprise();
   const hasAccess = hasFullAccess(book.id);
   const coverImage = getBookCover(book.id);
 
@@ -41,7 +41,7 @@ export function BookCard({ book, onBuy, onSubscribe, onView }: BookCardProps) {
           {hasAccess && (
             <Badge className="bg-success text-success-foreground">
               <Check className="h-3 w-3 mr-1" />
-              {user.subscriptionType === 'subscriber' ? 'Subscribed' : 'Owned'}
+              Institutional Access
             </Badge>
           )}
         </div>
@@ -92,24 +92,14 @@ export function BookCard({ book, onBuy, onSubscribe, onView }: BookCardProps) {
             Open Book
           </Button>
         ) : (
-          <div className="flex flex-col gap-2 w-full">
-            <Button 
-              variant="cta" 
-              onClick={() => onBuy(book)}
-              className="w-full"
-            >
-              <ShoppingCart className="h-4 w-4 mr-1.5" />
-              Buy — ${book.price}
-            </Button>
-            <Button 
-              variant="outline" 
-              onClick={onSubscribe}
-              className="w-full text-accent hover:text-accent"
-            >
-              <Crown className="h-4 w-4 mr-1.5" />
-              Or Subscribe
-            </Button>
-          </div>
+          <Button 
+            variant="outline" 
+            className="w-full"
+            disabled
+          >
+            <Building2 className="h-4 w-4 mr-1.5" />
+            Institutional Access Required
+          </Button>
         )}
       </CardFooter>
     </Card>

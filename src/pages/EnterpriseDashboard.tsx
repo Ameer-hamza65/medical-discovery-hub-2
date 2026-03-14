@@ -1,9 +1,11 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { motion } from 'framer-motion';
 import { useEnterprise } from '@/context/EnterpriseContext';
 import { useBooks } from '@/context/BookContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   Building2, 
@@ -17,9 +19,16 @@ import {
   XCircle,
   BarChart3,
   FileText,
-  Settings
+  Settings,
+  Sparkles,
+  Clock,
+  Crown,
+  Lock,
+  Download
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
+import { TierBadge } from '@/components/TierBadge';
 import {
   BarChart,
   Bar,
@@ -37,14 +46,31 @@ import {
 
 const CHART_COLORS = ['hsl(166 76% 32%)', 'hsl(213 50% 35%)', 'hsl(38 92% 50%)', 'hsl(280 50% 40%)', 'hsl(0 65% 35%)'];
 
+interface AIQueryLog {
+  id: string;
+  query_type: string;
+  book_title: string;
+  chapter_title: string;
+  response_time_ms: number;
+  created_at: string;
+}
+
 export default function EnterpriseDashboard() {
   const navigate = useNavigate();
+  const [aiLogs, setAiLogs] = useState<AIQueryLog[]>([]);
+  const [aiLoading, setAiLoading] = useState(true);
   const { 
     currentEnterprise, 
     currentUser, 
     isEnterpriseMode,
     usageStats, 
     complianceStatus,
+    currentTier,
+    isSeatLimitExceeded,
+    seatUtilizationPercent,
+    facilities,
+    facilityUsageStats,
+    getEnterpriseFacilities,
     getEnterpriseUsers,
     getEnterpriseDepartments,
     getEnterpriseBookAccess,
@@ -52,6 +78,20 @@ export default function EnterpriseDashboard() {
     isComplianceOfficer
   } = useEnterprise();
   const { books } = useBooks();
+
+  useEffect(() => {
+    async function fetchAILogs() {
+      setAiLoading(true);
+      const { data } = await supabase
+        .from('ai_query_logs')
+        .select('id, query_type, book_title, chapter_title, response_time_ms, created_at')
+        .order('created_at', { ascending: false })
+        .limit(100);
+      setAiLogs(data || []);
+      setAiLoading(false);
+    }
+    fetchAILogs();
+  }, []);
 
   if (!isEnterpriseMode || !currentEnterprise) {
     return (
@@ -92,9 +132,14 @@ export default function EnterpriseDashboard() {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <div className="bg-primary text-primary-foreground">
+      <div className="medical-gradient">
         <div className="container mx-auto px-4 py-8">
-          <div className="flex items-center justify-between">
+          <motion.div
+            className="flex items-center justify-between"
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+          >
             <div>
               <div className="flex items-center gap-3 mb-2">
                 <div 
@@ -104,28 +149,114 @@ export default function EnterpriseDashboard() {
                   {currentEnterprise.name.charAt(0)}
                 </div>
                 <div>
-                  <h1 className="text-2xl font-bold">{currentEnterprise.name}</h1>
-                  <p className="text-primary-foreground/80 text-sm">
+                  <h1 className="text-2xl font-bold text-foreground">{currentEnterprise.name}</h1>
+                  <p className="text-muted-foreground text-sm">
                     {currentEnterprise.type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())} • {currentEnterprise.domain}
                   </p>
                 </div>
               </div>
             </div>
-            <div className="text-right">
-              <p className="text-sm text-primary-foreground/80">Logged in as</p>
-              <p className="font-medium">{currentUser?.name}</p>
-              <Badge variant="secondary" className="mt-1">
-                {currentUser?.role.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
-              </Badge>
+            <div className="flex items-center gap-3">
+              {currentTier && <TierBadge tier={currentTier.id} size="lg" />}
+              <div className="text-right">
+                <p className="text-sm text-muted-foreground">Logged in as</p>
+                <p className="font-medium">{currentUser?.name}</p>
+                <Badge variant="secondary" className="mt-1">
+                  {currentUser?.role.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                </Badge>
+              </div>
             </div>
-          </div>
+          </motion.div>
         </div>
       </div>
 
       {/* Dashboard Content */}
       <div className="container mx-auto px-4 py-8">
+        {/* Seat Warning Banner */}
+        {seatUtilizationPercent >= 90 && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-6"
+          >
+            <Card className={`${isSeatLimitExceeded ? 'border-destructive/50 bg-destructive/5' : 'border-warning/50 bg-warning/5'}`}>
+              <CardContent className="pt-4 pb-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <AlertTriangle className={`h-5 w-5 ${isSeatLimitExceeded ? 'text-destructive' : 'text-warning'}`} />
+                    <div>
+                      <p className="font-semibold text-sm">
+                        {isSeatLimitExceeded ? 'Seat limit exceeded' : 'Approaching seat limit'}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {currentEnterprise.usedSeats} of {currentEnterprise.licenseSeats} seats used ({seatUtilizationPercent}%)
+                      </p>
+                    </div>
+                  </div>
+                  <Button variant="outline" size="sm" onClick={() => navigate('/subscribe')}>
+                    {isSeatLimitExceeded ? 'Upgrade Now' : 'Manage Seats'}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
+
+        {/* Current Plan Card */}
+        {currentTier && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.1 }}
+            className="mb-8"
+          >
+            <Card className="border-accent/20 bg-accent/5">
+              <CardContent className="pt-6">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Crown className="h-5 w-5 text-accent" />
+                      <h3 className="font-semibold text-lg">{currentTier.name} Plan</h3>
+                      <TierBadge tier={currentTier.id} showTooltip={false} size="sm" />
+                    </div>
+                    <p className="text-sm text-muted-foreground">{currentTier.description}</p>
+                  </div>
+                  <div className="grid grid-cols-3 gap-6 text-center">
+                    <div>
+                      <p className="text-2xl font-bold">{currentEnterprise.usedSeats}/{currentEnterprise.licenseSeats === -1 ? '∞' : currentEnterprise.licenseSeats}</p>
+                      <p className="text-xs text-muted-foreground">Seats</p>
+                      {currentEnterprise.licenseSeats > 0 && (
+                        <Progress value={seatUtilizationPercent} className={`h-1.5 mt-1 ${seatUtilizationPercent >= 90 ? '[&>div]:bg-destructive' : seatUtilizationPercent >= 75 ? '[&>div]:bg-warning' : ''}`} />
+                      )}
+                    </div>
+                    <div>
+                      <p className="text-2xl font-bold">{currentTier.maxCollections === -1 ? '5' : currentTier.maxCollections}</p>
+                      <p className="text-xs text-muted-foreground">Collections</p>
+                    </div>
+                    <div>
+                      <p className="text-2xl font-bold">{currentTier.features.aiUsageMonthly === -1 ? '∞' : currentTier.features.aiUsageMonthly}</p>
+                      <p className="text-xs text-muted-foreground">AI Queries/mo</p>
+                    </div>
+                  </div>
+                  {currentTier.id !== 'enterprise' && (
+                    <Button onClick={() => navigate('/subscribe')} className="gap-2">
+                      <Crown className="h-4 w-4" />
+                      Upgrade Plan
+                    </Button>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
+
         {/* Quick Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <motion.div
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.15 }}
+        >
           <Card>
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
@@ -177,7 +308,7 @@ export default function EnterpriseDashboard() {
               </div>
             </CardContent>
           </Card>
-        </div>
+        </motion.div>
 
         {/* Main Dashboard Tabs */}
         <Tabs defaultValue="overview" className="space-y-6">
@@ -330,6 +461,124 @@ export default function EnterpriseDashboard() {
                 </CardContent>
               </Card>
             </div>
+
+            {/* Multi-Location Facility Overview (Enterprise tier only) */}
+            {currentTier?.features.multiLocation && currentEnterprise && (() => {
+              const enterpriseFacilities = getEnterpriseFacilities(currentEnterprise.id);
+              const facilityStats = facilityUsageStats.filter(fs => 
+                enterpriseFacilities.some(f => f.id === fs.facilityId)
+              );
+              
+              if (enterpriseFacilities.length === 0) return null;
+              
+              return (
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold flex items-center gap-2">
+                    <Building2 className="h-5 w-5 text-accent" />
+                    Multi-Location Overview
+                  </h3>
+                  <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {enterpriseFacilities.map((facility) => {
+                      const stats = facilityStats.find(fs => fs.facilityId === facility.id);
+                      return (
+                        <Card key={facility.id} className={!facility.isActive ? 'opacity-60' : ''}>
+                          <CardHeader className="pb-2">
+                            <div className="flex items-center justify-between">
+                              <Badge variant="secondary" className="text-xs">
+                                {facility.type.replace('_', ' ')}
+                              </Badge>
+                              {facility.isActive ? (
+                                <Badge className="bg-success/10 text-success border-success/20 text-xs">Active</Badge>
+                              ) : (
+                                <Badge variant="outline" className="text-xs">Inactive</Badge>
+                              )}
+                            </div>
+                            <CardTitle className="text-base mt-2">{facility.name}</CardTitle>
+                            <CardDescription className="text-xs">
+                              {facility.city}, {facility.state}
+                            </CardDescription>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="grid grid-cols-2 gap-3 text-sm">
+                              <div>
+                                <p className="text-muted-foreground text-xs">Seats</p>
+                                <p className="font-semibold">{facility.usedSeats}/{facility.seatAllocation}</p>
+                              </div>
+                              <div>
+                                <p className="text-muted-foreground text-xs">Compliance</p>
+                                <p className="font-semibold">{stats?.complianceScore ?? '—'}%</p>
+                              </div>
+                              <div>
+                                <p className="text-muted-foreground text-xs">Views</p>
+                                <p className="font-semibold">{stats?.totalViews?.toLocaleString() ?? '—'}</p>
+                              </div>
+                              <div>
+                                <p className="text-muted-foreground text-xs">AI Queries</p>
+                                <p className="font-semibold">{stats?.aiQueries?.toLocaleString() ?? '—'}</p>
+                              </div>
+                            </div>
+                            {/* Seat utilization bar */}
+                            <div className="mt-3">
+                              <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                                <div 
+                                  className="h-full bg-accent rounded-full"
+                                  style={{ width: `${(facility.usedSeats / facility.seatAllocation) * 100}%` }}
+                                />
+                              </div>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                {Math.round((facility.usedSeats / facility.seatAllocation) * 100)}% seat utilization
+                              </p>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                  </div>
+
+                  {/* Aggregated Stats */}
+                  <Card className="bg-accent/5 border-accent/20">
+                    <CardContent className="pt-6">
+                      <div className="flex items-center gap-2 mb-4">
+                        <TrendingUp className="h-5 w-5 text-accent" />
+                        <h4 className="font-semibold">Aggregated Multi-Location Summary</h4>
+                      </div>
+                      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-center">
+                        <div>
+                          <p className="text-2xl font-bold">{enterpriseFacilities.length}</p>
+                          <p className="text-xs text-muted-foreground">Facilities</p>
+                        </div>
+                        <div>
+                          <p className="text-2xl font-bold">
+                            {enterpriseFacilities.reduce((sum, f) => sum + f.usedSeats, 0)}
+                          </p>
+                          <p className="text-xs text-muted-foreground">Total Active Users</p>
+                        </div>
+                        <div>
+                          <p className="text-2xl font-bold">
+                            {facilityStats.reduce((sum, s) => sum + s.totalViews, 0).toLocaleString()}
+                          </p>
+                          <p className="text-xs text-muted-foreground">Total Views</p>
+                        </div>
+                        <div>
+                          <p className="text-2xl font-bold">
+                            {facilityStats.reduce((sum, s) => sum + s.aiQueries, 0).toLocaleString()}
+                          </p>
+                          <p className="text-xs text-muted-foreground">AI Queries</p>
+                        </div>
+                        <div>
+                          <p className="text-2xl font-bold">
+                            {facilityStats.length > 0 
+                              ? Math.round(facilityStats.reduce((sum, s) => sum + s.complianceScore, 0) / facilityStats.length) 
+                              : 0}%
+                          </p>
+                          <p className="text-xs text-muted-foreground">Avg Compliance</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              );
+            })()}
           </TabsContent>
 
           {/* Compliance Tab */}
@@ -436,18 +685,146 @@ export default function EnterpriseDashboard() {
             </div>
           </TabsContent>
 
-          {/* Analytics Tab */}
-          <TabsContent value="analytics">
+          <TabsContent value="analytics" className="space-y-6">
+            {/* AI Activity Summary */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Total AI Queries</p>
+                      <p className="text-3xl font-bold">{aiLogs.length}</p>
+                      <p className="text-xs text-muted-foreground">all time</p>
+                    </div>
+                    <Sparkles className="h-10 w-10 text-accent" />
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Avg Response Time</p>
+                      <p className="text-3xl font-bold">
+                        {aiLogs.length > 0 
+                          ? (aiLogs.reduce((s, l) => s + l.response_time_ms, 0) / aiLogs.length / 1000).toFixed(1) 
+                          : '0'}s
+                      </p>
+                      <p className="text-xs text-muted-foreground">across all queries</p>
+                    </div>
+                    <Clock className="h-10 w-10 text-accent" />
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Query Types Used</p>
+                      <p className="text-3xl font-bold">
+                        {new Set(aiLogs.map(l => l.query_type)).size}
+                      </p>
+                      <p className="text-xs text-muted-foreground">distinct types</p>
+                    </div>
+                    <BarChart3 className="h-10 w-10 text-accent" />
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="grid lg:grid-cols-2 gap-6">
+              {/* Queries by Type */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">AI Queries by Type</CardTitle>
+                  <CardDescription>Distribution of AI query types</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-64">
+                    {(() => {
+                      const typeCounts = aiLogs.reduce<Record<string, number>>((acc, l) => {
+                        acc[l.query_type] = (acc[l.query_type] || 0) + 1;
+                        return acc;
+                      }, {});
+                      const pieData = Object.entries(typeCounts).map(([name, value]) => ({ name, value }));
+                      return pieData.length > 0 ? (
+                        <ResponsiveContainer width="100%" height="100%">
+                          <PieChart>
+                            <Pie data={pieData} cx="50%" cy="50%" innerRadius={40} outerRadius={70} paddingAngle={3} dataKey="value" label={({ name, value }) => `${name} (${value})`}>
+                              {pieData.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
+                            </Pie>
+                            <Tooltip />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      ) : (
+                        <div className="flex items-center justify-center h-full text-muted-foreground text-sm">No AI queries yet</div>
+                      );
+                    })()}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Most Queried Books */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Most Queried Titles</CardTitle>
+                  <CardDescription>Books with the most AI interactions</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {(() => {
+                      const bookCounts = aiLogs.reduce<Record<string, number>>((acc, l) => {
+                        acc[l.book_title] = (acc[l.book_title] || 0) + 1;
+                        return acc;
+                      }, {});
+                      const sorted = Object.entries(bookCounts).sort((a, b) => b[1] - a[1]).slice(0, 5);
+                      return sorted.length > 0 ? sorted.map(([title, count], i) => (
+                        <div key={title} className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <span className="text-sm font-medium text-muted-foreground w-6">{i + 1}.</span>
+                            <span className="text-sm font-medium truncate max-w-[250px]">{title}</span>
+                          </div>
+                          <Badge variant="secondary">{count} queries</Badge>
+                        </div>
+                      )) : (
+                        <p className="text-sm text-muted-foreground text-center py-8">No AI queries yet</p>
+                      );
+                    })()}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Recent AI Activity */}
             <Card>
               <CardHeader>
-                <CardTitle>Detailed Analytics</CardTitle>
-                <CardDescription>
-                  Coming soon: Advanced analytics with custom date ranges, user segmentation, and export capabilities.
-                </CardDescription>
+                <CardTitle className="text-lg">Recent AI Activity</CardTitle>
+                <CardDescription>Latest AI queries from your organization</CardDescription>
               </CardHeader>
-              <CardContent className="py-12 text-center">
-                <BarChart3 className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-                <p className="text-muted-foreground">Advanced analytics features are under development.</p>
+              <CardContent>
+                {aiLoading ? (
+                  <p className="text-sm text-muted-foreground text-center py-8">Loading...</p>
+                ) : aiLogs.length > 0 ? (
+                  <div className="space-y-3">
+                    {aiLogs.slice(0, 10).map(log => (
+                      <div key={log.id} className="flex items-center justify-between py-2 border-b border-border/50 last:border-0">
+                        <div className="flex items-center gap-3">
+                          <Badge variant="outline" className="text-xs capitalize">{log.query_type}</Badge>
+                          <div>
+                            <p className="text-sm font-medium truncate max-w-[300px]">{log.book_title}</p>
+                            <p className="text-xs text-muted-foreground">{log.chapter_title}</p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-xs text-muted-foreground">{new Date(log.created_at).toLocaleDateString()}</p>
+                          <p className="text-xs text-muted-foreground">{(log.response_time_ms / 1000).toFixed(1)}s</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground text-center py-8">No AI queries recorded yet. Use the AI Assistant in the reader to get started.</p>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -474,11 +851,32 @@ export default function EnterpriseDashboard() {
                       <span>Compliance Report</span>
                       <span className="text-xs text-muted-foreground">Training completion status</span>
                     </Button>
-                    <Button variant="outline" className="h-auto py-4 flex-col gap-2">
-                      <Users className="h-6 w-6" />
-                      <span>User Activity</span>
-                      <span className="text-xs text-muted-foreground">Individual user metrics</span>
-                    </Button>
+                    {currentTier?.features.individualUserTracking ? (
+                      <Button variant="outline" className="h-auto py-4 flex-col gap-2">
+                        <Users className="h-6 w-6" />
+                        <span>User Activity</span>
+                        <span className="text-xs text-muted-foreground">Individual user metrics</span>
+                      </Button>
+                    ) : (
+                      <Button variant="outline" className="h-auto py-4 flex-col gap-2 opacity-50" disabled>
+                        <Lock className="h-6 w-6 text-muted-foreground" />
+                        <span>User Activity</span>
+                        <span className="text-xs text-warning">Pro plan required</span>
+                      </Button>
+                    )}
+                    {currentTier?.features.csvExport ? (
+                      <Button variant="outline" className="h-auto py-4 flex-col gap-2">
+                        <Download className="h-6 w-6" />
+                        <span>CSV Export</span>
+                        <span className="text-xs text-muted-foreground">Download usage data</span>
+                      </Button>
+                    ) : (
+                      <Button variant="outline" className="h-auto py-4 flex-col gap-2 opacity-50" disabled>
+                        <Lock className="h-6 w-6 text-muted-foreground" />
+                        <span>CSV Export</span>
+                        <span className="text-xs text-warning">Pro plan required</span>
+                      </Button>
+                    )}
                   </div>
                 </CardContent>
               </Card>
