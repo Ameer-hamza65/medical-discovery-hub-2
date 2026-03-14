@@ -74,9 +74,14 @@ Replace the values with what you copied in Step 6.
 ## Step 8: Deploy Edge Functions (AI Features)
 
 ### Install Supabase CLI
-
 ```bash
-npm install -g supabase
+Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
+```
+```bash
+irm get.scoop.sh | iex
+```
+```bash
+npm install supabase
 ```
 
 ### Login to Supabase
